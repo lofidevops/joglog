@@ -1,0 +1,10 @@
+# .coveragerc to control coverage.py
+[run]
+branch = True
+command_line = -m pytest
+omit =
+    .tox/*
+    *.egg-info
+    *local/share*
+    *settings.py
+    */migrations/*

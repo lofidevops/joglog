@@ -1,0 +1,27 @@
+[[source]]
+url = "https://pypi.python.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+Django = "==3.0.6"
+django-extensions = "==2.2.9"
+djangorestframework = "==3.11.0"
+python-dotenv = "==0.13.0"
+requests = "==2.23.0"
+requests-cache = "==0.5.2"
+
+[dev-packages]
+tox = "*"
+coverage = "*"
+pytest-django = "*"
+black = "==19.10b0"
+pycco = "*"
+pipenv-pex = "*"
+
+[requires]
+python_version = "3.7"
+
+[dev-packages.e1839a8]
+path = "."
+editable = true

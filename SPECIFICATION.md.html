@@ -1,0 +1,348 @@
+<meta charset="utf-8">
+
+                            **Jog Log**
+         A REST API that tracks the jogging times of users.
+
+Copyright 2020 David Seaward <br />
+SPDX-License-Identifier: GPL-3.0-or-later
+
+# Version history
+
+This is a living document. The version history provides a high-level
+summary of changes and highlights in each version. A version may be in
+draft, submitted or approved.
+
+## Initial version (approved)
+
+First version, covering all areas. "Logic and validation" contains
+important out-of-scope definitions. The format and filtering for
+location and weather has been only roughly defined, pending
+implementation details.
+
+## Implementation updates I (submitted)
+
+1. Calendar week will be calculated using ISO 8601 and stored as a YYYYWW integer.
+2. `dn_speed` is rounded to one decimal place.
+3. Updated location and weather fields to final session definition.
+4. Removed `is_in_report` and `is_active` fields, not in original spec.
+5. Highlighted user creation rules (anonymous user can register).
+6. Noted that the system supports users changing their passwords.
+7. Provide JSON serialization for user and session.
+8. Listed supported filter tokens. Noted rules for literals.
+9. Added a note that minor validation issues are recorded in the codebase, not this document.
+10. Highlight that for convenience we will use the Django REST GUI for convenience,
+    and additionally demonstrate that the system follows the RESTful request/response pattern.
+
+## Implementation updates II (submitted)
+
+*Final review before demonstration. No significant changes are expected.*
+
+1. Update weekly report columns to match implementation. Does not include a session
+   count. Includes distance, duration and speed fields. Updated associated filter docs.
+2. Making sure all queries and fields are correct / reflected in implementation.
+3. Created REVIEW.md.html for (light) acceptance testing.
+
+# User story
+
+I am a jogger. I want to log my daily jogging sessions, so that I can
+later review my performance statistics.
+
+## Weekly performance report
+
+Reports on average statistics for user sessions in a calendar week.
+Note that the average is calculated with the *total distance* and
+*total duration* over the *days in the week*. So missed/skipped days
+do not lower the average.
+
+Sample:
+
+| User | Week   | Distance | Duration | Avg. speed |
+| ---- | ------ | -------- | -------- | ---------- |
+| 2    | 202019 | 5        | 2        | 2.5        |
+| 2    | 202020 | 15       | 3        | 5.0        |
+| 2    | 202022 | 3        | 2        | 1.5        |
+
+# Interface
+
+All actions will take place via a RESTful API. The interface
+must work without a browser-based GUI.
+
+We will use the Django REST GUI for demonstration purposes.
+For each query we will demonstrate that the system functions
+without the GUI (a RESTful query URL generating raw JSON output).
+
+# Roles and permissions
+
+## Jogger
+
+A jogger can sign up for an account, and manage their own session
+logs. They cannot access or manage other users' data.
+
+## Manager
+
+A manager can manage all jogger accounts. They cannot access or
+manage any session logs. A manager account must be created by an
+administrator.
+
+## Administrator
+
+An administrator can manage any record, including joggers' session
+logs. They can create jogger, manager or administrator accounts.
+
+## Supported actions
+
+The following actions will be supported:
+
+| Role       | Record  | Action  | Notes              |
+| ---------- | ------- | ------- | ------------------ |
+| Anonymous  | User    | Create  | Registration.      |
+| Jogger     | User    | CRUD    | Own user only.     |
+| Jogger     | Session | CRUD    | Own sessions only. |
+| Jogger     | Report  | Read    | Own sessions only. |
+| Manager    | User    | CRUD    | Joggers only.      |
+| Admin      | User    | CRUD    | All user types.    |
+| Admin      | Session | CRUD    | All users.         |
+| Admin      | Report  | Read    | All users.         |
+
+All users will be able to change their own password. Managers
+can override jogger passwords. Admins can override jogger
+and manager passwords.
+
+# Session record
+
+## Overview
+
+The session log is the core record, summarised in the table below.
+Fields are required unless otherwise specified. Additional notes are
+indicated with an asterisk and expanded on below.
+
+| Field               | Type     | Unit     | Notes        |
+| ------------------- | -------- | -------- | ------------ |
+| url                 | URL      |          | Contains ID. Clickable. |
+| start               | Datetime | UTC      | Captured to nearest minute. |
+| dn_week             | Integer  | YYYYWW   | Denormalised. * |
+| local_timezone      | String   | tzdb     | Optional. Default blank. * |
+| distance            | Integer  | Meters   | |
+| duration            | Integer  | Minutes  | |
+| lu_weather_location | String   | *        | Optional. Default blank. |
+| lu_weather          | String   | *        | May be blank.   |
+| dn_speed            | Decimal  | km/h     | Denormalised. * |
+| user                | URL       |         | Foreign key. |
+
+## JSON input format
+
+```
+{
+    "user": X,  # replace X with user ID
+    "start": "2020-05-29T01:01",  # note time format
+    "local_timezone": "Europe/London",
+    "distance": 5,
+    "duration": 3,
+    "lu_weather_location": "London,UK",
+    "user": 1  # user ID
+}
+```
+
+## Additional field notes
+
+### local_timezone
+
+The local timezone is recorded in tzdb/Olson format. It may be set by
+the user, the client or it may be blank. The system does not validate
+this value. It is the responsibility of the JSON consumer to display
+the time using the local timezone.
+
+### lu_weather_location
+
+User-based city name for weather lookup. If blank or not recognised,
+no weather result will be stored.
+
+### lu_weather
+
+Summary of weather conditions: clear, cloudy, precipitation or other.
+
+This is a lookup (lu) value taken from an external service and stored
+locally for convenience. The lookup be performed again at any time.
+
+### dn_speed
+
+This field stores the speed in km/h of the current session, rounded to
+one decimal place. This value is **not** used in the weekly average
+calculation.
+
+This is a derived value stored in a denormalised (dn) field for
+convenience. It can be recalculated at any time.
+
+The formula is:
+
+```
+distance_km = distance / 1000
+duration_h = duration / 60
+speed = round((distance_km / duration_h), 0.1)
+```
+
+### dn_week
+
+This field stores the ISO 8601 calendar week of the current date. Calendar
+weeks are numbered 1--52 (sometimes 53), starting around January 1 of the
+current year. A week starts on a Monday.
+
+For more detail see [The Mathematics of the ISO 8601 Calender](https://www.staff.science.uu.nl/~gent0113/calendar/isocalendar.htm)
+and the Python standard library [date.isocalendar()](https://docs.python.org/3/library/datetime.html#datetime.date.isocalendar)
+definition.
+
+For convenience, the week is expressed as an integer value, for example
+`202001` or `202013`.
+
+This is a derived value stored in a denormalised (dn) field for
+convenience. It can be recalculated at any time.
+
+## Logic and validation
+
+The following additional restrictions and assumptions are made:
+
+### Check for a maximum of one session per calendar day
+
+We check that only one session is made per UTC calendar day. If the
+user attempts to create an additional session on the same day, the
+system will return an error.
+
+### Assume sessions do not overlap
+
+We assume that sessions do not overlap. The system will not detect if
+the user creates sessions that overlap (for example, a three-hour
+session starts at 23.00 on day 1, and a second session starts at 1.00
+on day 2.)
+
+### Assume session data is plausible
+
+We assume session data is plausible. For example, the system will not
+detect if the jogger runs at impossible speeds.
+
+### Assume location data is coherent
+
+We assume that the location and local timezone are coherent. The system
+will not detect if the user captures an invalid location/timezone pair.
+
+### Minor validation issues recorded in the codebase
+
+Other validation issues considered minor are not recorded here. They are
+implemented, documented and tested in the codebase. For example,
+validating that the distance travelled is not negative.
+
+# Other records
+
+Other records will use default Django mechanisms. For example:
+
+* The User model for user accounts. JSON input format:
+
+```
+{
+    "username": "joggingfan99",
+    "password": "**********",  # plaintext input, encrypted output
+    "is_staff": false,
+    "is_superuser": false
+}
+```
+
+* Manager accounts are indicated by Django's `is_staff` flag.
+
+* The first administrator account will be created with Django's
+  `createsuperuser` function.
+
+# Queries
+
+## Filter format
+
+Filters will take the form of:
+
+```
+http://.../?filter=EXPRESSION
+```
+
+...where EXPRESSION is a human-readable infix function with field names
+available as variables. For example:
+
+```
+http://.../?filter=start lt '2020-06-01' or (speed gt 0.2 and lu_weather ne 'CLEAR')
+```
+
+## Operators, literals and evaluations
+
+The following filter operators are available:
+
+| Operator    | Meaning   |
+| ----------- | --------- |
+| `eq`        | equal     |
+| `ne`        | not equal |
+| `lt`        | less than |
+| `lte`       | less than or equal |
+| `gt`        | greater than |
+| `gte`       | greater than or equal |
+
+Literals must be encoded as follows:
+
+| Type    | Example      |
+| ------- | ------------ |
+| String  | 'value'      |
+| Decimal | 10.0         |
+| Date    | '1999-12-31' |
+| Week    | 202013       |
+
+## Sessions
+
+The following fields will be available to query on:
+
+| Field          | Type     | Unit     | Notes        |
+| -------------- | -------- | -------- | ------------ |
+| start          | Datetime | UTC      | `yyyy-mm-dd` format for filter. |
+| dn_week        | Integer  | YYYYWW   | |
+| local_timezone | String   | | |
+| distance       | Integer  | Meters   | |
+| duration       | Integer  | Minutes  | |
+| dn_speed       | Decimal  | km/h     | |
+| lu_weather_location | String | -     | String query. |
+| lu_weather     | String   | -        | Filter by clear/cloudy/precipitation/other |
+| user           | ID       |          | Administrator may query on other IDs. |
+
+## Users
+
+The following fields will be available to query on:
+
+| Field          | Type        | Unit    | Notes        |
+| -------------- | ----------- | ------- | ------------ |
+| username       | String      |         | |
+| role           | Enum        |         | Filter by jogger/staff/administrator |
+
+### Filter by role
+
+There is no single "role" field, but users will be able to query as
+though there were.
+
+## Report
+
+The following fields will be available to query on:
+
+| Field          | Type     | Unit    | Notes        |
+| -------------- | -------- | ------- | ------------ |
+| user           | ID       |         | User ID. Administrator may query on other IDs. |
+| week           | Integer  | YYYYWW  | |
+| distance       | Integer  | m       | |
+| duration       | Integer  | mins    | |
+| avg_speed      | Decimal  | km/h    | Average of the above. |
+
+The results will resemble the report defined at the beginning of this
+document.
+
+# Non-functional requirements
+
+1. The system should include automated, passing unit tests.
+
+2. The system should include automated, passing end-to-end tests.
+
+3. It should be possible to demonstrate the system via screen-sharing.
+
+There are no other non-functional requirements (performance,
+scaling...) for this deliverable.
+
+<!-- Markdeep: --><style class="fallback">body{visibility:hidden;white-space:pre;font-family:monospace}</style><script src="markdeep.min.js" charset="utf-8"></script><script src="https://casual-effects.com/markdeep/latest/markdeep.min.js" charset="utf-8"></script><script>window.alreadyProcessedMarkdeep||(document.body.style.visibility="visible")</script>

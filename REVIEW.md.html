@@ -1,0 +1,223 @@
+<meta charset="utf-8">
+
+                   **Review / acceptance testing**
+       Jog Log, a REST API that tracks the jogging times of users.
+
+Copyright 2020 David Seaward <br />
+SPDX-License-Identifier: GPL-3.0-or-later
+
+This is a reduced set of user acceptance tests to help guide the
+demonstration. Each step should succeed unambiguously. Every action is
+made as a raw request-response, with the REST Framework GUI serving as
+a link-driven client. We will use the "Raw data" field to submit
+JSON text (rather than individual GUI fields).
+
+# User creation
+
+## Anonymous registration
+
+* Start logged out.
+* Note that you cannot access the session or report lists (403 forbidden).
+* Click on the user list.
+* Scroll to the bottom and open the "Raw data" tab.
+* Note that you cannot register as a superuser. Attempting to POST the
+  following JSON block will fail:
+
+```
+{
+    "username": "bigboots",
+    "password": "secret",
+    "is_staff": true,
+    "is_superuser": true
+}
+```
+
+* But trying to register as a regular user (jogger) will succeed:
+
+```
+{
+    "username": "justdoit",
+    "password": "secret",
+    "is_staff": false,
+    "is_superuser": false
+}
+```
+
+* You can now click on "Log in" and use your new credentials.
+
+## Change password
+
+* As a logged in jogger, note that you can see the list of users, but
+  you cannot access their individual links (403 forbidden).
+* Visit your user own link.
+* Click on the "Raw data" tab and PUT the following JSON block to
+  change your password:
+
+```
+{
+    "username": "justdoit",
+    "password": "verysecret",
+    "is_staff": false,
+    "is_superuser": false
+}
+```
+
+* Log out and in again to confirm that the change was successful.
+
+## As a superuser, create a staff user
+
+* Log in as `superuser` with the password `password`.
+* Note that you now have access to the session, user and report lists,
+  and can see all data.
+* Go to the user list and POST the following JSON block:
+
+```
+{
+    "username": "themanager",
+    "password": "secret",
+    "is_staff": true,
+    "is_superuser": false
+}
+```
+
+## As a staff user, create a jogger
+
+* Log in with the staff credentials above.
+* Note that you do not have access to the session and report lists.
+* Go to the user list and POST the JSON block (below).
+* Note the user number (ID) of the new user.
+
+```
+{
+    "username": "theflash",
+    "password": "secret",
+    "is_staff": false,
+    "is_superuser": false
+}
+```
+
+# Session management
+
+## Log multiple jogging sessions
+
+* Log in as `theflash` with the password `secret`. (Or any other
+  jogger account where you know the ID.)
+* Note that you have access to the session and report links, but
+  they are empty because you don't have any data yet.
+* Go to the session list and POST these JSON blocks (below).
+* Note that speed, weather and calendar week are calculated /
+  retrieved on your behalf.
+
+**Week 22**
+
+```
+{
+    "user": X,  # replace with your ID
+    "start": "2020-05-26T01:01",
+    "local_timezone": "Europe/London",
+    "distance": 21,
+    "duration": 2,
+    "lu_weather_location": "London,UK"
+}
+```
+
+```
+{
+    "user": X,
+    "start": "2020-05-27T02:02",
+    "local_timezone": "Europe/London",
+    "distance": 20,
+    "duration": 2,
+    "lu_weather_location": "London,UK"
+}
+```
+
+```
+{
+    "user": X,
+    "start": "2020-05-28T03:03",
+    "local_timezone": "Europe/London",
+    "distance": 19,
+    "duration": 2,
+    "lu_weather_location": "London,UK"
+}
+```
+
+**Week 23**
+
+```
+{
+    "user": X,
+    "start": "2020-06-02T04:04",
+    "local_timezone": "Europe/London",
+    "distance": 40,
+    "duration": 2,
+    "lu_weather_location": "London,UK"
+}
+```
+
+```
+{
+    "user": X,
+    "start": "2020-06-03T05:05",
+    "local_timezone": "Europe/London",
+    "distance": 40,
+    "duration": 2,
+    "lu_weather_location": "London,UK"
+}
+```
+
+```
+{
+    "user": X,
+    "start": "2020-06-04T06:06",
+    "local_timezone": "Europe/London",
+    "distance": 40,
+    "duration": 2,
+    "lu_weather_location": "London,UK"
+}
+```
+
+## Delete a session
+
+* Go back to the list of sessions.
+* Confirm that you can delete the last session (2020-06-04).
+
+## Filter by user
+
+* Go to the session list.
+* Append the following to the URL, where `X` is your user ID.
+
+```
+?filter=speed lt 1.0
+```
+
+* Confirm that only sessions below 1 km/h appear.
+
+## Use a complex filter
+
+* Go to the session list.
+* Append the following to the URL:
+
+```
+?filter=speed lt 1.0 and (distance lt 20 or start lte '2020-05-27')
+```
+
+* Confirm that the correct sessions appear: 2020-05-28 and 2020-05-26
+
+# Reporting
+
+* With the same jogging account, visit the report link.
+* Confirm the following values for Week 22:
+
+   * Total distance: 21 + 20 + 19 = 60 m
+   * Total duration: 2 + 2 + 2 = 6 mins
+   * Average speed: 60 / 6, convert units = 0.6 km/h
+
+* Confirm the following values for Week 23:
+
+   * Total distance: 40 + 40 = 80 m
+   * Total duration: 2 + 2 = 4 mins
+   * Average speed: 80 / 4, convert units = 1.2 km/h
+
+<!-- Markdeep: --><style class="fallback">body{visibility:hidden;white-space:pre;font-family:monospace}</style><script src="markdeep.min.js" charset="utf-8"></script><script src="https://casual-effects.com/markdeep/latest/markdeep.min.js" charset="utf-8"></script><script>window.alreadyProcessedMarkdeep||(document.body.style.visibility="visible")</script>
