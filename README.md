@@ -6,7 +6,7 @@ REST API to record jogging sessions.
 
 Please see:
 
-* [Specification](SPECIFICIATION.md.html). Including user
+* [Specification](SPECIFICATION.md.html). Including user
   stories, roles, data structures and other requirements.
 
 * [Review](REVIEW.md.html). User acceptance tests.
